@@ -5,6 +5,16 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
+def determine_device():
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        print("CUDA is available. Using GPU for training.")
+    else:
+        device = torch.device("cpu")
+        print("CUDA is not available. Using CPU for training.")
+
+    return device
+
 def plot_training_vs_validation_curve(path):
     train_err = np.loadtxt("{}_train_err.csv".format(path))
     val_err = np.loadtxt("{}_val_err.csv".format(path))
