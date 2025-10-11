@@ -1,163 +1,17 @@
-import numpy as np
-import time
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
-import torchvision
-from torch.utils.data.sampler import SubsetRandomSampler
-import torchvision.transforms as transforms
+import time
+import numpy as np
+import matplotlib.pyplot as plt
 
-###############################################################################
-# Data Loading
-
-def get_relevant_indices(dataset, classes, target_classes):
-    """ Return the indices for datapoints in the dataset that belongs to the
-    desired target classes, a subset of all possible classes.
-
-    Args:
-        dataset: Dataset object
-        classes: A list of strings denoting the name of each class
-        target_classes: A list of strings denoting the name of desired classes
-                        Should be a subset of the 'classes'
-    Returns:
-        indices: list of indices that have labels corresponding to one of the
-                 target classes
-    """
-    indices = []
-    for i in range(len(dataset)):
-        # Check if the label is in the target classes
-        label_index = dataset[i][1] # ex: 3
-        label_class = classes[label_index] # ex: 'cat'
-        if label_class in target_classes:
-            indices.append(i)
-    return indices
-
-def get_data_loader(target_classes, batch_size):
-    """ Loads images of cats and dogs, splits the data into training, validation
-    and testing datasets. Returns data loaders for the three preprocessed datasets.
-
-    Args:
-        target_classes: A list of strings denoting the name of the desired
-                        classes. Should be a subset of the argument 'classes'
-        batch_size: A int representing the number of samples per batch
-
-    Returns:
-        train_loader: iterable training dataset organized according to batch size
-        val_loader: iterable validation dataset organized according to batch size
-        test_loader: iterable testing dataset organized according to batch size
-        classes: A list of strings denoting the name of each class
-    """
-
-    classes = ('plane', 'car', 'bird', 'cat',
-               'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-    ########################################################################
-    # The output of torchvision datasets are PILImage images of range [0, 1].
-    # We transform them to Tensors of normalized range [-1, 1].
-    transform = transforms.Compose(
-        [transforms.ToTensor(),
-         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    # Load CIFAR10 training data
-    trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
-                                            download=True, transform=transform)
-    # Get the list of indices to sample from
-    relevant_indices = get_relevant_indices(trainset, classes, target_classes)
-
-    # Split into train and validation
-    np.random.seed(1000) # Fixed numpy random seed for reproducible shuffling
-    np.random.shuffle(relevant_indices)
-    split = int(len(relevant_indices) * 0.8) #split at 80%
-
-    # split into training and validation indices
-    relevant_train_indices, relevant_val_indices = relevant_indices[:split], relevant_indices[split:]
-    train_sampler = SubsetRandomSampler(relevant_train_indices)
-    train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
-                                               num_workers=1, sampler=train_sampler)
-    val_sampler = SubsetRandomSampler(relevant_val_indices)
-    val_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
-                                              num_workers=1, sampler=val_sampler)
-    # Load CIFAR10 testing data
-    testset = torchvision.datasets.CIFAR10(root='./data', train=False,
-                                           download=True, transform=transform)
-    # Get the list of indices to sample from
-    relevant_test_indices = get_relevant_indices(testset, classes, target_classes)
-    test_sampler = SubsetRandomSampler(relevant_test_indices)
-    test_loader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
-                                             num_workers=1, sampler=test_sampler)
-    return train_loader, val_loader, test_loader, classes
-
-###############################################################################
-# Training
-def get_model_name(name, batch_size, learning_rate, epoch):
-    """ Generate a name for the model consisting of all the hyperparameter values
-
-    Args:
-        config: Configuration object containing the hyperparameters
-    Returns:
-        path: A string with the hyperparameter name and value concatenated
-    """
-    path = "model_{0}_bs{1}_lr{2}_epoch{3}".format(name,
-                                                   batch_size,
-                                                   learning_rate,
-                                                   epoch)
-    return path
-
-def normalize_label(labels):
-    """
-    Given a tensor containing 2 possible values, normalize this to 0/1
-
-    Args:
-        labels: a 1D tensor containing two possible scalar values
-    Returns:
-        A tensor normalize to 0/1 value
-    """
-    max_val = torch.max(labels)
-    min_val = torch.min(labels)
-    norm_labels = (labels - min_val)/(max_val - min_val)
-    return norm_labels
-
-def evaluate(net, loader, criterion):
-    """ Evaluate the network on the validation set.
-
-     Args:
-         net: PyTorch neural network object
-         loader: PyTorch data loader for the validation set
-         criterion: The loss function
-     Returns:
-         err: A scalar for the avg classification error over the validation set
-         loss: A scalar for the average loss function over the validation set
-     """
-    total_loss = 0.0
-    total_err = 0.0
-    total_epoch = 0
-    for i, data in enumerate(loader, 0):
-        inputs, labels = data
-        labels = normalize_label(labels)  # Convert labels to 0/1
-        outputs = net(inputs)
-        loss = criterion(outputs, labels.float())
-        corr = (outputs > 0.0).squeeze().long() != labels
-        total_err += int(corr.sum())
-        total_loss += loss.item()
-        total_epoch += len(labels)
-    err = float(total_err) / total_epoch
-    loss = float(total_loss) / (i + 1)
-    return err, loss
-
-###############################################################################
-# Training Curve
-def plot_training_curve(path):
-    """ Plots the training curve for a model run, given the csv files
-    containing the train/validation error/loss.
-
-    Args:
-        path: The base path of the csv files produced during training
-    """
-    import matplotlib.pyplot as plt
+def plot_training_vs_validation_curve(path):
     train_err = np.loadtxt("{}_train_err.csv".format(path))
     val_err = np.loadtxt("{}_val_err.csv".format(path))
     train_loss = np.loadtxt("{}_train_loss.csv".format(path))
     val_loss = np.loadtxt("{}_val_loss.csv".format(path))
-    plt.title("Train vs Validation Error")
+
+    plt.title("Training vs Validation Error")
     n = len(train_err) # number of epochs
     plt.plot(range(1,n+1), train_err, label="Train")
     plt.plot(range(1,n+1), val_err, label="Validation")
@@ -165,10 +19,148 @@ def plot_training_curve(path):
     plt.ylabel("Error")
     plt.legend(loc='best')
     plt.show()
-    plt.title("Train vs Validation Loss")
+
+    plt.title("Training vs Validation Loss")
     plt.plot(range(1,n+1), train_loss, label="Train")
     plt.plot(range(1,n+1), val_loss, label="Validation")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend(loc='best')
     plt.show()
+
+def plot_training_curve(path):
+    train_err = np.loadtxt("{}_train_err.csv".format(path))
+    train_loss = np.loadtxt("{}_train_loss.csv".format(path))
+
+    plt.title("Training Error")
+    n = len(train_err) # number of epochs
+    plt.plot(range(1,n+1), train_err, label="Train")
+    plt.xlabel("Epoch")
+    plt.ylabel("Error")
+    plt.legend(loc='best')
+    plt.show()
+
+    plt.title("Training Loss")
+    plt.plot(range(1,n+1), train_loss, label="Train")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.legend(loc='best')
+    plt.show()
+
+def get_model_name(name, batch_size, learning_rate, epoch):
+    path = "model_{0}_bs{1}_lr{2}_epoch{3}".format(name,
+                                                   batch_size,
+                                                   learning_rate,
+                                                   epoch)
+    return path
+
+def evaluate(net, data_loader, criterion):
+    total_loss = 0.0
+    total_err = 0.0
+    total_samples = 0
+
+    net.eval() # Set model to evaluation mode for optimization
+    with torch.no_grad(): # Disable gradient calculation for optimization
+        for i, data in enumerate(data_loader, 0):
+            inputs, labels = data
+            inputs, labels = inputs.to(device), labels.to(device)
+
+            outputs = net(inputs)
+            loss = criterion(outputs, labels)
+
+            # Multi-class error computation
+            _, predicted = torch.max(outputs, 1)  # Get index of highest logit
+            total_err += (predicted != labels).sum().item()
+            total_loss += loss.item()
+            total_samples += labels.size(0)
+
+    err = float(total_err) / total_samples
+    loss = float(total_loss) / (i + 1)
+    return err, loss
+
+def train_net(net, train_loader, val_loader=None, batch_size=64,
+              learning_rate=0.01, num_epochs=30):
+    torch.manual_seed(1000)
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9)
+
+    train_err = np.zeros(num_epochs)
+    train_loss = np.zeros(num_epochs)
+
+    # only init validation error/loss variables if a val_loader is provided
+    if (val_loader is not None):
+        val_err = np.zeros(num_epochs)
+        val_loss = np.zeros(num_epochs)
+
+    print("Beginning Training...")
+    start_time = time.time()
+    for epoch in range(num_epochs):  # loop over the dataset multiple times
+        total_train_loss = 0.0
+        total_train_err = 0.0
+        total_samples = 0
+
+        net.train() # Set model to training mode
+        for i, data in enumerate(train_loader, 0):
+            # Get the inputs, and move them to the right hardware (device)
+            inputs, labels = data
+            inputs, labels = inputs.to(device), labels.to(device)
+
+            # Zero the parameter gradients
+            optimizer.zero_grad()
+            # Forward pass, backward pass, and optimize
+            outputs = net(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            # Calculate error and store it for multi class classification
+            _, predicted = torch.max(outputs, 1)
+            total_train_err += (predicted != labels).sum().item()
+
+            # Store loss
+            total_train_loss += loss.item()
+            total_samples += len(labels)
+
+        train_err[epoch] = float(total_train_err) / total_samples
+        train_loss[epoch] = float(total_train_loss) / (i+1)
+
+        # Only calculate valdation error/loss if a val_loader is provided
+        if (val_loader is not None):
+            val_err[epoch], val_loss[epoch] = evaluate(net, val_loader,
+                                                       criterion)
+            print(
+                f"Epoch: {epoch + 1} "
+                f"Train err: {train_err[epoch]}, "
+                f"Train loss: {train_loss[epoch]} "
+                f"| Validation err: {val_err[epoch]}, "
+                f"Validation loss: {val_loss[epoch]}"
+            )
+        else:
+            print(
+                f"Epoch: {epoch + 1} "
+                f"Train err: {train_err[epoch]}, "
+                f"Train loss: {train_loss[epoch]}"
+            )
+
+        # Save the current model (checkpoint) to a file
+        model_path = get_model_name(net.name, batch_size, learning_rate, epoch)
+        torch.save(net.state_dict(), model_path)
+
+    print('Ending Training')
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print("Total time elapsed: {:.2f} seconds".format(elapsed_time))
+
+    # Write the train loss/err into CSV file for plotting later
+    np.savetxt("{}_train_err.csv".format(model_path), train_err)
+    np.savetxt("{}_train_loss.csv".format(model_path), train_loss)
+
+    # Only save the validation error/loss if a val_loader is provided
+    if (val_loader is not None):
+        np.savetxt("{}_val_err.csv".format(model_path), val_err)
+        np.savetxt("{}_val_loss.csv".format(model_path), val_loss)
+
+    # at the very end, empty the cuda cache if cuda is used
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
