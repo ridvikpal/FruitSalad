@@ -54,7 +54,7 @@ def get_model_name(name, batch_size, learning_rate, epoch):
                                                    epoch)
     return path
 
-def evaluate(net, data_loader, criterion):
+def evaluate(net, data_loader, criterion, device):
     total_loss = 0.0
     total_err = 0.0
     total_samples = 0
@@ -78,7 +78,7 @@ def evaluate(net, data_loader, criterion):
     loss = float(total_loss) / (i + 1)
     return err, loss
 
-def train_net(net, train_loader, val_loader=None, batch_size=64,
+def train_net(net, train_loader, device, val_loader=None, batch_size=64,
               learning_rate=0.01, num_epochs=30):
     torch.manual_seed(1000)
 
