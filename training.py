@@ -97,7 +97,7 @@ def train_net(net, train_loader, device, val_loader=None, batch_size=64,
         # Only calculate valdation error/loss if a val_loader is provided
         if (val_loader is not None):
             val_err[epoch], val_loss[epoch] = evaluate(net, val_loader,
-                                                       criterion)
+                                                       criterion, device)
             print(
                 f"Epoch: {epoch + 1} "
                 f"Train err: {train_err[epoch]}, "
