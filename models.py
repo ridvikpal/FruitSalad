@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch.functional as F
 
+
 class PrimaryModel(nn.Module):
     def __init__(self):
         super(PrimaryModel, self).__init__()

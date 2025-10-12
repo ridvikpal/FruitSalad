@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 def plot_training_vs_validation_curve(path):
     train_err = np.loadtxt("{}_train_err.csv".format(path))
     val_err = np.loadtxt("{}_val_err.csv".format(path))
