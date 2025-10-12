@@ -1,9 +1,11 @@
 import torch
 import torch.optim as optim
+import torch.nn as nn
 import numpy as np
 import time
 
 from visualizing import get_model_name
+
 
 def determine_device():
     if torch.cuda.is_available():
