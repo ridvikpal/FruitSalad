@@ -22,6 +22,9 @@ def evaluate(net, data_loader, criterion, device):
     total_err = 0.0
     total_samples = 0
 
+    # move the model to the correct device
+    net.to(device)
+
     net.eval() # Set model to evaluation mode for optimization
     with torch.no_grad(): # Disable gradient calculation for optimization
         for i, data in enumerate(data_loader, 0):
@@ -55,6 +58,9 @@ def train_net(net, train_loader, device, val_loader=None, batch_size=64,
     if (val_loader is not None):
         val_err = np.zeros(num_epochs)
         val_loss = np.zeros(num_epochs)
+
+    # move the model to the correct device
+    net.to(device)
 
     print("Beginning Training...")
     start_time = time.time()
